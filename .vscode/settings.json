@@ -1,0 +1,5 @@
+{
+    "python.analysis.extraPaths": [
+        "./lectures/lecture5/python"
+    ]
+}
