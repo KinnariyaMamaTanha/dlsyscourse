@@ -1,0 +1,15 @@
+CompileFlags:
+  Add: 
+    - "-I/home/kinnariya/.local/share/uv/python/cpython-3.10.17-linux-x86_64-gnu/include/python3.10"
+    - "-I/home/kinnariya/Projects/dlsyscourse/.venv/lib/python3.10/site-packages/pybind11/include"
+    - "-std=c++14"
+
+Diagnostics:
+  ClangTidy:
+    Add: modernize*
+    Remove: modernize-use-trailing-return-type
+
+Style:
+  TabSize: 4
+  UseTab: Never
+

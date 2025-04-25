@@ -6,8 +6,12 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "ipykernel>=6.29.5",
+    "mugrade",
     "numdifftools>=0.9.41",
     "numpy>=2.2.5",
     "pybind11>=2.13.6",
     "pytest>=8.3.5",
 ]
+
+[tool.uv.sources]
+mugrade = { git = "https://github.com/dlsyscourse/mugrade.git" }
