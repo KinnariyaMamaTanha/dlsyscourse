@@ -1,6 +1,9 @@
 {
     "python.analysis.extraPaths": [
-        "./lectures/lecture5/python",
-        "./hw/hw0/src"
+        // "./lectures/lecture5/python", // Uncomment for lecture5
+        // "./hw/hw0/src", // Uncomment for hw0
+        "./hw/hw1/python",
+        "./hw/hw1/apps",
+        "./hw/hw1/tests",
     ]
 }

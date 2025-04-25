@@ -12,3 +12,6 @@ wheels/
 
 # c/cpp files
 *.so
+
+# temporary files
+*tmp*
