@@ -1,95 +1,184 @@
-# Initialization
+# Initialization Functions in Needle
 
-The initialization module (`init`) provides functions for creating and initializing tensors with specific patterns or random values. These are essential for setting up neural network parameters with proper initial values.
+This document describes the initialization functions available in Needle for creating and initializing tensors with various patterns and distributions.
 
-## Structure
+## Basic Initialization
 
-The initialization module is organized in the `init` directory:
-- `__init__.py` - Imports all initialization functions from submodules
-- `init_basic.py` - Contains basic initialization functions
-
-## Initialization Functions
-
-### Random Initializations
-
-- **rand**: Generate tensors with random values from a uniform distribution between `low` and `high`
-  ```python
-  rand(*shape, low=0.0, high=1.0, device=None, dtype="float32", requires_grad=False)
-  ```
-
-- **randn**: Generate tensors with random values from a normal distribution with `mean` and `std`
-  ```python
-  randn(*shape, mean=0.0, std=1.0, device=None, dtype="float32", requires_grad=False)
-  ```
-
-- **randb**: Generate binary random tensors (True/False) with probability `p` of being True
-  ```python
-  randb(*shape, p=0.5, device=None, dtype="bool", requires_grad=False)
-  ```
-
-### Constant Initializations
-
-- **constant**: Generate tensors filled with a constant value `c`
-  ```python
-  constant(*shape, c=1.0, device=None, dtype="float32", requires_grad=False)
-  ```
-
-- **ones**: Generate tensors filled with ones (shortcut for `constant` with `c=1.0`)
-  ```python
-  ones(*shape, device=None, dtype="float32", requires_grad=False)
-  ```
-
-- **zeros**: Generate tensors filled with zeros (shortcut for `constant` with `c=0.0`)
-  ```python
-  zeros(*shape, device=None, dtype="float32", requires_grad=False)
-  ```
-
-### Special Initializations
-
-- **one_hot**: Generate one-hot encoding tensor
-  ```python
-  one_hot(n, i, device=None, dtype="float32", requires_grad=False)
-  ```
-
-### Clone-based Initializations
-
-- **zeros_like**: Create a tensor of zeros with the same shape, dtype, and device as the input tensor
-  ```python
-  zeros_like(array, *, device=None, requires_grad=False)
-  ```
-
-- **ones_like**: Create a tensor of ones with the same shape, dtype, and device as the input tensor
-  ```python
-  ones_like(array, *, device=None, requires_grad=False)
-  ```
-
-## Common Parameters
-
-Most initialization functions share common parameters:
-
-- **shape**: The shape of the tensor to be created (passed as positional arguments)
-- **device**: The device where the tensor will be stored (CPU by default)
-- **dtype**: The data type of the tensor ("float32" by default)
-- **requires_grad**: Whether the tensor requires gradient computation (False by default)
-
-## Usage Examples
-
+### Zeros and Ones
 ```python
-import needle as ndl
+# Create tensor filled with zeros
+zeros = needle.init.zeros(3, 4)  # Shape (3, 4)
 
-# Create a 3x3 tensor filled with random values from a normal distribution
-weights = ndl.init.randn(3, 3, std=0.01, requires_grad=True)
+# Create tensor filled with ones
+ones = needle.init.ones(2, 3)    # Shape (2, 3)
+```
 
-# Create a vector of zeros
-bias = ndl.init.zeros(3, requires_grad=True)
+### Constant Values
+```python
+# Create tensor filled with constant value
+const = needle.init.full((2, 3), fill_value=5.0)
+```
 
-# Create a batch of one-hot encoded vectors
-labels = ndl.init.one_hot(10, ndl.Tensor([0, 3, 9]))
+## Random Initialization
 
-# Create a tensor with same shape as another
-weights_like = ndl.init.ones_like(weights)
+### Uniform Distribution
+```python
+# Random values from uniform distribution
+uniform = needle.init.rand(3, 4)           # Default range [0, 1)
+uniform = needle.init.uniform(3, 4, 
+                            low=-1, 
+                            high=1)         # Custom range
+```
+
+### Normal Distribution
+```python
+# Random values from normal distribution
+normal = needle.init.randn(3, 4)           # Standard normal
+normal = needle.init.normal(3, 4, 
+                          mean=0, 
+                          std=0.1)          # Custom parameters
+```
+
+## Neural Network Initializations
+
+### Xavier/Glorot Initialization
+```python
+# Xavier uniform initialization
+xavier_uniform = needle.init.xavier_uniform(in_dim, out_dim)
+
+# Xavier normal initialization
+xavier_normal = needle.init.xavier_normal(in_dim, out_dim)
+```
+
+### Kaiming/He Initialization
+```python
+# Kaiming uniform initialization
+kaiming_uniform = needle.init.kaiming_uniform(in_dim, out_dim)
+
+# Kaiming normal initialization
+kaiming_normal = needle.init.kaiming_normal(in_dim, out_dim)
 ```
 
 ## Implementation Details
 
-All initialization functions use the device API (as defined in `backend_numpy.py`) to create the array with the specified pattern, then wrap it in a `Tensor` object. This ensures that tensors can be created on any supported device with the same API.
+### Base Functions
+
+1. **zeros**
+   ```python
+   def zeros(*shape, dtype="float32", device=None):
+       """
+       Creates a tensor filled with zeros
+       
+       Args:
+           *shape: The shape of the tensor
+           dtype: Data type of the tensor
+           device: Device to create the tensor on
+       """
+   ```
+
+2. **ones**
+   ```python
+   def ones(*shape, dtype="float32", device=None):
+       """
+       Creates a tensor filled with ones
+       
+       Args:
+           *shape: The shape of the tensor
+           dtype: Data type of the tensor
+           device: Device to create the tensor on
+       """
+   ```
+
+### Random Generators
+
+1. **rand/uniform**
+   ```python
+   def uniform(low=0.0, high=1.0, *shape, dtype="float32", device=None):
+       """
+       Creates a tensor with random values from uniform distribution
+       
+       Args:
+           low: Lower bound of the distribution
+           high: Upper bound of the distribution
+           *shape: The shape of the tensor
+           dtype: Data type of the tensor
+           device: Device to create the tensor on
+       """
+   ```
+
+2. **randn/normal**
+   ```python
+   def normal(mean=0.0, std=1.0, *shape, dtype="float32", device=None):
+       """
+       Creates a tensor with random values from normal distribution
+       
+       Args:
+           mean: Mean of the distribution
+           std: Standard deviation of the distribution
+           *shape: The shape of the tensor
+           dtype: Data type of the tensor
+           device: Device to create the tensor on
+       """
+   ```
+
+## Weight Initialization Theory
+
+### Xavier/Glorot Initialization
+Designed to maintain variance across layers in networks using linear transformations:
+
+- **Uniform**: \[ W \sim U\left(-\sqrt{\frac{6}{n_{in} + n_{out}}}, \sqrt{\frac{6}{n_{in} + n_{out}}}\right) \]
+- **Normal**: \[ W \sim N\left(0, \sqrt{\frac{2}{n_{in} + n_{out}}}\right) \]
+
+### Kaiming/He Initialization
+Designed for networks using ReLU activation:
+
+- **Uniform**: \[ W \sim U\left(-\sqrt{\frac{6}{n_{in}}}, \sqrt{\frac{6}{n_{in}}}\right) \]
+- **Normal**: \[ W \sim N\left(0, \sqrt{\frac{2}{n_{in}}}\right) \]
+
+## Best Practices
+
+1. **Choosing Initialization**
+   - Use Xavier for tanh/sigmoid activations
+   - Use Kaiming for ReLU activations
+   - Consider layer width when choosing parameters
+
+2. **Numerical Stability**
+   - Initialize biases to small values or zero
+   - Scale initialization based on layer width
+   - Consider gradient flow in deep networks
+
+3. **Random Seeds**
+   ```python
+   # Set random seed for reproducibility
+   needle.init.seed(42)
+   ```
+
+## Example Usage
+
+```python
+import needle as ndl
+
+# Create a neural network layer
+in_features = 784
+out_features = 512
+
+# Initialize weights with Xavier normal
+weights = ndl.init.xavier_normal(in_features, out_features)
+
+# Initialize biases with zeros
+biases = ndl.init.zeros(out_features)
+
+# Create layer output
+output = input @ weights + biases
+```
+
+## Custom Initialization
+
+To create a custom initialization:
+
+```python
+def custom_init(*shape, dtype="float32", device=None):
+    """Custom initialization function"""
+    data = # Your initialization logic here
+    return needle.Tensor(data, dtype=dtype, device=device)
+```

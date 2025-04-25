@@ -1,79 +1,116 @@
-# Autograd
+# Automatic Differentiation in Needle
 
-This module implements the core data structures and logic for the Needle automatic differentiation (autograd) framework. It provides the computational graph abstraction, operator definitions, and the mechanisms for forward and backward passes (gradient computation). The design is inspired by modern deep learning frameworks, supporting both eager and lazy evaluation.
+Needle implements automatic differentiation through a dynamic computation graph. This document explains the core components and how they work together.
 
-## Key Components
+## Core Components
 
-### 1. Global Variables
-
-- **LAZY_MODE**: Controls whether computation is performed eagerly or lazily.
-- **TENSOR_COUNTER**: Tracks the number of active tensor objects (for debugging/memory management).
-
-### 2. NDArray and Backend
-
-- **NDArray**: Alias for `numpy.ndarray`. The backend can be swapped in future assignments.
-- **array_api**: The array API used for computation, currently set to NumPy.
-
-### 3. Operator Classes
-
-- **Op**: Base class for all operators. Defines the interface for:
-  - `__call__`: Operator invocation.
-  - `compute`: Forward computation (to be implemented by subclasses).
-  - `gradient`: Computes the partial adjoint (gradient) for each input.
-  - `gradient_as_tuple`: Convenience method to always return a tuple from gradient call
-
-- **TensorOp**: Subclass of `Op` for operators that output a single `Tensor`.
-- **TensorTupleOp**: Subclass of `Op` for operators that output a `TensorTuple`.
-
-### 4. Value Classes
-
-- **Value**: Base class for nodes in the computational graph.
-  - Tracks the operator (`op`), input nodes (`inputs`), cached data, and whether gradients are required.
-  - Provides methods for realizing cached data, checking if a node is a leaf, and initialization.
-  - Class methods for creating constant nodes and nodes from operators.
-
-- **Tensor**: Subclass of `Value` representing a tensor in the graph.
-  - Handles device, dtype, and data management.
-  - Operator overloads for arithmetic and matrix operations.
-  - Methods for backward pass (`backward`), detaching from the graph, and conversion to NumPy.
-  - Properties for shape, dtype, and device.
-
-- **TensorTuple**: Subclass of `Value` representing a tuple of tensors.
-  - Supports tuple operations, indexing, and detachment.
-
-### 5. Gradient Computation
-
-- **compute_gradient_of_variables**: Given an output tensor and its gradient, traverses the computational graph in reverse topological order to compute and store gradients for all variables involved.
-
-### 6. Graph Traversal
-
-- **find_topo_sort**: Returns a topological ordering of nodes for a given list of output nodes using post-order DFS.
-- **topo_sort_dfs**: Helper function for DFS traversal.
-
-### 7. Helper Methods
-
-- **sum_node_list**: Custom sum function to efficiently sum a list of nodes without creating redundant computation nodes.
-
-## Usage
-
-- **Tensor Creation**: Use `Tensor` to create new tensors, specifying data, device, dtype, and whether gradients are required.
-- **Computation**: Use arithmetic operators or Needle ops to build computation graphs.
-- **Backward Pass**: Call `.backward()` on a tensor to compute gradients with respect to all variables in the graph.
-- **Lazy/Eager Mode**: Control evaluation strategy via `LAZY_MODE`.
-
-## Extension Points
-
-- Implementations for `compute_gradient_of_variables`, `find_topo_sort`, and `topo_sort_dfs` are required for full backward functionality.
-- Operator subclasses (in `needle.ops`) must implement `compute` and `gradient` for each operation.
-
-## Example
+### Value Class
+The base class for all values in the computational graph.
 
 ```python
-import needle as ndl
-
-x = ndl.Tensor([1, 2, 3], dtype="float32", requires_grad=True)
-y = x + 1
-z = y * 2
-z.backward()
-print(x.grad)  # Should print the gradient of z with respect to x
+class Value:
+    op: Optional[Op]        # The operator that produced this value
+    inputs: List["Value"]   # Input values to the operator
+    cached_data: NDArray    # Cached computed data
+    requires_grad: bool     # Whether this value requires gradients
 ```
+
+Key methods:
+- `realize_cached_data()`: Computes and caches the value
+- `is_leaf()`: Checks if this is a leaf node (no operator)
+- `backward()`: Computes gradients through the computation graph
+
+### Tensor Class
+The main user-facing class representing multi-dimensional arrays.
+
+```python
+class Tensor(Value):
+    grad: "Tensor"  # Gradient of this tensor
+```
+
+Key features:
+- Supports standard mathematical operations (+, -, *, /, @)
+- Provides shape manipulation (reshape, transpose)
+- Enables automatic gradient computation
+- Integrates with NumPy backend
+
+### Operator (Op) Class
+Base class for all operations in Needle.
+
+```python
+class Op:
+    def compute(self, *args: Tuple[NDArray]) -> NDArray
+    def gradient(self, out_grad: "Value", node: "Value") -> Union["Value", Tuple["Value"]]
+```
+
+Key responsibilities:
+- Forward computation (`compute`)
+- Gradient computation (`gradient`)
+- Input/output handling
+
+## How Automatic Differentiation Works
+
+1. **Forward Pass**
+   - Creates nodes in computation graph
+   - Computes and caches values
+   - Tracks dependencies between operations
+
+2. **Backward Pass**
+   - Starts from output node
+   - Traverses graph in reverse topological order
+   - Accumulates gradients using chain rule
+
+3. **Gradient Computation**
+   - Each operation defines its gradient computation
+   - Gradients are accumulated at nodes
+   - Leaf nodes store final gradients
+
+## Example Usage
+
+```python
+# Create tensors
+x = needle.Tensor([1, 2, 3], requires_grad=True)
+y = needle.Tensor([4, 5, 6], requires_grad=True)
+
+# Forward computation
+z = x * y + y
+
+# Backward pass
+z.backward()
+
+# Access gradients
+print(x.grad)  # dy/dx
+print(y.grad)  # dy/dy
+```
+
+## Implementation Details
+
+### Topological Sort
+The `find_topo_sort` function orders nodes for gradient computation:
+```python
+def find_topo_sort(node_list: List[Value]) -> List[Value]:
+    """Returns nodes in reverse dependency order"""
+```
+
+### Gradient Computation
+The `compute_gradient_of_variables` function handles gradient propagation:
+```python
+def compute_gradient_of_variables(output_tensor, out_grad):
+    """Computes gradients of output w.r.t. each node"""
+```
+
+## Best Practices
+
+1. **Memory Management**
+   - Use `detach()` to create views without gradient tracking
+   - Clear unnecessary intermediate values
+
+2. **Gradient Computation**
+   - Set `requires_grad=False` for constant tensors
+   - Use `backward()` only on scalar outputs
+   - Handle non-scalar outputs with appropriate gradients
+
+3. **Performance**
+   - Cache computed values when possible
+   - Avoid unnecessary gradient computations
+   - Use in-place operations when appropriate

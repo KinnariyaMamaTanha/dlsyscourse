@@ -125,7 +125,7 @@ class Value:
         *,
         num_outputs: int = 1,
         cached_data: List[object] = None,
-        requires_grad: Optional[bool] = None
+        requires_grad: Optional[bool] = None,
     ):
         global TENSOR_COUNTER
         TENSOR_COUNTER += 1
@@ -194,6 +194,16 @@ class TensorTuple(Value):
 
 
 class Tensor(Value):
+    """A multi-dimensional array representing a tensor in the computational graph.
+
+    This class extends the Value class to provide tensor operations with automatic
+    differentiation capabilities. It supports various mathematical operations,
+    shape manipulations, and gradient computation.
+
+    Attributes:
+        grad: The gradient of this tensor with respect to some scalar output.
+    """
+
     grad: "Tensor"
 
     def __init__(
@@ -203,8 +213,20 @@ class Tensor(Value):
         device: Optional[Device] = None,
         dtype=None,
         requires_grad=True,
-        **kwargs
+        **kwargs,
     ):
+        """Initialize a new Tensor.
+
+        Args:
+            array: Data to initialize the tensor with. Can be a numpy array,
+                  another Tensor, or any array-like object.
+            device: The device to store this tensor on (CPU/GPU). Defaults to None,
+                   which uses the device of the input tensor or CPU.
+            dtype: Data type of the tensor. Defaults to None, which uses the dtype
+                  of the input tensor or the default dtype.
+            requires_grad: Whether to track gradients for this tensor. Defaults to True.
+            **kwargs: Additional keyword arguments.
+        """
         if isinstance(array, Tensor):
             if device is None:
                 device = array.device
@@ -230,12 +252,31 @@ class Tensor(Value):
 
     @staticmethod
     def _array_from_numpy(numpy_array, device, dtype):
+        """Convert a numpy array to the appropriate array type based on the backend.
+
+        Args:
+            numpy_array: The numpy array to convert.
+            device: The device to place the array on.
+            dtype: The data type for the array.
+
+        Returns:
+            The converted array in the appropriate backend format.
+        """
         if array_api is numpy:
             return numpy.array(numpy_array, dtype=dtype)
         return array_api.array(numpy_array, device=device, dtype=dtype)
 
     @staticmethod
     def make_from_op(op: Op, inputs: List["Value"]):
+        """Create a new tensor from an operation and its inputs.
+
+        Args:
+            op: The operation that produces this tensor.
+            inputs: The input values to the operation.
+
+        Returns:
+            A new Tensor resulting from the operation.
+        """
         tensor = Tensor.__new__(Tensor)
         tensor._init(op, inputs)
         if not LAZY_MODE:
@@ -246,6 +287,15 @@ class Tensor(Value):
 
     @staticmethod
     def make_const(data, requires_grad=False):
+        """Create a constant tensor from data.
+
+        Args:
+            data: The data to create the constant tensor from.
+            requires_grad: Whether the constant requires gradients. Defaults to False.
+
+        Returns:
+            A new constant Tensor.
+        """
         tensor = Tensor.__new__(Tensor)
         tensor._init(
             None,
@@ -259,10 +309,23 @@ class Tensor(Value):
 
     @property
     def data(self):
+        """Get a detached version of this tensor that shares the same data.
+
+        Returns:
+            A detached Tensor with the same data.
+        """
         return self.detach()
 
     @data.setter
     def data(self, value):
+        """Set the data of this tensor.
+
+        Args:
+            value: A Tensor with the new data.
+
+        Raises:
+            AssertionError: If value is not a Tensor or has a different dtype.
+        """
         assert isinstance(value, Tensor)
         assert value.dtype == self.dtype, "%s %s" % (
             value.dtype,
@@ -271,19 +334,38 @@ class Tensor(Value):
         self.cached_data = value.realize_cached_data()
 
     def detach(self):
-        """Create a new tensor that shares the data but detaches from the graph."""
+        """Create a new tensor that shares the data but detaches from the graph.
+
+        Returns:
+            A new Tensor with the same data but no gradient tracking.
+        """
         return Tensor.make_const(self.realize_cached_data())
 
     @property
     def shape(self):
+        """Get the shape of this tensor.
+
+        Returns:
+            The shape of the tensor as a tuple.
+        """
         return self.realize_cached_data().shape
 
     @property
     def dtype(self):
+        """Get the data type of this tensor.
+
+        Returns:
+            The data type of the tensor.
+        """
         return self.realize_cached_data().dtype
 
     @property
     def device(self):
+        """Get the device this tensor is stored on.
+
+        Returns:
+            The device of the tensor (CPU/GPU).
+        """
         data = self.realize_cached_data()
         # numpy array always sits on cpu
         if array_api is numpy:
@@ -291,6 +373,12 @@ class Tensor(Value):
         return data.device
 
     def backward(self, out_grad=None):
+        """Compute gradients of this tensor with respect to graph leaves.
+
+        Args:
+            out_grad: The gradient of the output with respect to this tensor.
+                     If None, defaults to a tensor of ones with the same shape.
+        """
         out_grad = (
             out_grad
             if out_grad
@@ -299,66 +387,174 @@ class Tensor(Value):
         compute_gradient_of_variables(self, out_grad)
 
     def __repr__(self):
+        """Return a string representation of the tensor.
+
+        Returns:
+            A string representation of the tensor.
+        """
         return "needle.Tensor(" + str(self.realize_cached_data()) + ")"
 
     def __str__(self):
+        """Return a string representation of the tensor data.
+
+        Returns:
+            A string representation of the tensor data.
+        """
         return self.realize_cached_data().__str__()
 
     def numpy(self):
+        """Convert this tensor to a numpy array.
+
+        Returns:
+            A numpy array with the same data as this tensor.
+        """
         data = self.realize_cached_data()
         if array_api is numpy:
             return data
         return data.numpy()
 
     def __add__(self, other):
+        """Add another tensor or scalar to this tensor.
+
+        Args:
+            other: The tensor or scalar to add.
+
+        Returns:
+            A new tensor with the result of the addition.
+        """
         if isinstance(other, Tensor):
             return needle.ops.EWiseAdd()(self, other)
         else:
             return needle.ops.AddScalar(other)(self)
 
     def __mul__(self, other):
+        """Multiply this tensor by another tensor or scalar.
+
+        Args:
+            other: The tensor or scalar to multiply by.
+
+        Returns:
+            A new tensor with the result of the multiplication.
+        """
         if isinstance(other, Tensor):
             return needle.ops.EWiseMul()(self, other)
         else:
             return needle.ops.MulScalar(other)(self)
 
     def __pow__(self, other):
+        """Raise this tensor to the power of another tensor or scalar.
+
+        Args:
+            other: The tensor or scalar exponent.
+
+        Returns:
+            A new tensor with the result of the power operation.
+        """
         if isinstance(other, Tensor):
             return needle.ops.EWisePow()(self, other)
         else:
             return needle.ops.PowerScalar(other)(self)
 
     def __sub__(self, other):
+        """Subtract another tensor or scalar from this tensor.
+
+        Args:
+            other: The tensor or scalar to subtract.
+
+        Returns:
+            A new tensor with the result of the subtraction.
+        """
         if isinstance(other, Tensor):
             return needle.ops.EWiseAdd()(self, needle.ops.Negate()(other))
         else:
             return needle.ops.AddScalar(-other)(self)
 
     def __truediv__(self, other):
+        """Divide this tensor by another tensor or scalar.
+
+        Args:
+            other: The tensor or scalar to divide by.
+
+        Returns:
+            A new tensor with the result of the division.
+        """
         if isinstance(other, Tensor):
             return needle.ops.EWiseDiv()(self, other)
         else:
             return needle.ops.DivScalar(other)(self)
 
     def __matmul__(self, other):
+        """Perform matrix multiplication with another tensor.
+
+        Args:
+            other: The tensor to multiply with.
+
+        Returns:
+            A new tensor with the result of the matrix multiplication.
+        """
         return needle.ops.MatMul()(self, other)
 
     def matmul(self, other):
+        """Perform matrix multiplication with another tensor.
+
+        Args:
+            other: The tensor to multiply with.
+
+        Returns:
+            A new tensor with the result of the matrix multiplication.
+        """
         return needle.ops.MatMul()(self, other)
 
     def sum(self, axes=None):
+        """Sum the tensor along specified axes.
+
+        Args:
+            axes: The axes to sum over. None means sum over all axes.
+
+        Returns:
+            A new tensor with the result of the summation.
+        """
         return needle.ops.Summation(axes)(self)
 
     def broadcast_to(self, shape):
+        """Broadcast this tensor to a new shape.
+
+        Args:
+            shape: The target shape to broadcast to.
+
+        Returns:
+            A new tensor broadcasted to the target shape.
+        """
         return needle.ops.BroadcastTo(shape)(self)
 
     def reshape(self, shape):
+        """Reshape this tensor to a new shape.
+
+        Args:
+            shape: The target shape to reshape to.
+
+        Returns:
+            A new tensor with the same data but reshaped.
+        """
         return needle.ops.Reshape(shape)(self)
 
     def __neg__(self):
+        """Negate this tensor.
+
+        Returns:
+            A new tensor with all elements negated.
+        """
         return needle.ops.Negate()(self)
 
     def transpose(self, axes=None):
+        """Transpose this tensor along specified axes.
+
+        Args:
+            axes: The permutation of the dimensions. None means reverse the dimensions.
+
+        Returns:
+            A new tensor with the dimensions permuted.
+        """
         return needle.ops.Transpose(axes)(self)
 
     __radd__ = __add__
@@ -383,7 +579,25 @@ def compute_gradient_of_variables(output_tensor, out_grad):
     reverse_topo_order = list(reversed(find_topo_sort([output_tensor])))
 
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    for node in reverse_topo_order:
+        # Accumulate gradients for the current node
+        node_grad = sum_node_list(node_to_output_grads_list[node])
+        
+        if node.is_leaf():
+            # For leaf nodes, we store the gradient but don't propagate further
+            node.grad = node_grad
+            continue
+            
+        # Compute gradients for each input
+        grads = node.op.gradient_as_tuple(node_grad, node)
+        
+        # Distribute gradients to inputs
+        for i, input_node in enumerate(node.inputs):
+            grad = grads[i]
+            if input_node not in node_to_output_grads_list:
+                node_to_output_grads_list[input_node] = [grad]
+            else:
+                node_to_output_grads_list[input_node].append(grad)
     ### END YOUR SOLUTION
 
 

@@ -1,79 +1,200 @@
-# Operations
+# Operations in Needle
 
-The operations module (`ops`) in Needle provides a collection of mathematical operations that can be performed on tensors. These operations form the building blocks for creating computational graphs with automatic differentiation support.
+This document describes the mathematical operations available in Needle and their implementations.
 
-## Structure
-
-The operations are organized in the `ops` directory:
-- `__init__.py` - Imports all operations from submodules
-- `ops_mathematic.py` - Contains mathematical operations like addition, multiplication, etc.
-
-## Mathematical Operations
+## Core Operation Types
 
 ### Element-wise Operations
 
-- **EWiseAdd / add**: Element-wise addition of two tensors
-- **AddScalar / add_scalar**: Add a scalar value to a tensor
-- **EWiseMul / multiply**: Element-wise multiplication of two tensors
-- **MulScalar / mul_scalar**: Multiply a tensor by a scalar
-- **EWisePow / power**: Element-wise power operation
-- **PowerScalar / power_scalar**: Raise tensor elements to a scalar power
-- **EWiseDiv / divide**: Element-wise division of two tensors
-- **DivScalar / divide_scalar**: Divide a tensor by a scalar
-- **Negate / negate**: Negate the elements of a tensor
-- **Log / log**: Element-wise natural logarithm
-- **Exp / exp**: Element-wise exponential function
-- **ReLU / relu**: Rectified Linear Unit activation function
+1. **Basic Arithmetic**
+   ```python
+   # Addition
+   z = x + y  # EWiseAdd
+   z = x + 5  # AddScalar
+   
+   # Multiplication
+   z = x * y  # EWiseMul
+   z = x * 2  # MulScalar
+   
+   # Division
+   z = x / y  # EWiseDiv
+   z = x / 3  # DivScalar
+   
+   # Power
+   z = x ** y  # EWisePow
+   z = x ** 2  # PowerScalar
+   ```
 
-### Tensor Manipulation
+2. **Activation Functions**
+   ```python
+   # ReLU
+   z = needle.ops.relu(x)
+   
+   # Sigmoid
+   z = needle.ops.sigmoid(x)
+   
+   # Tanh
+   z = needle.ops.tanh(x)
+   ```
 
-- **Transpose / transpose**: Permute the dimensions of a tensor
-- **Reshape / reshape**: Change the shape of a tensor without changing its data
-- **BroadcastTo / broadcast_to**: Broadcast a tensor to a new shape
-- **Summation / summation**: Sum tensor elements along specified axes
-- **MatMul / matmul**: Matrix multiplication
+### Matrix Operations
+
+1. **Matrix Multiplication**
+   ```python
+   # Using @ operator
+   z = x @ y
+   
+   # Using matmul function
+   z = needle.ops.matmul(x, y)
+   ```
+
+2. **Shape Operations**
+   ```python
+   # Reshape
+   z = x.reshape((2, 3))
+   
+   # Transpose
+   z = x.transpose()
+   z = x.transpose((1, 0))  # With axes specified
+   ```
+
+### Reduction Operations
+
+```python
+# Sum
+z = x.sum()           # Sum all elements
+z = x.sum(axis=0)     # Sum along axis 0
+z = x.sum(axis=(0,1)) # Sum along multiple axes
+
+# Mean
+z = needle.ops.mean(x)
+z = needle.ops.mean(x, axis=0)
+```
 
 ## Implementation Details
 
-Each operation is implemented as a subclass of `TensorOp` from the `autograd` module and provides two key methods:
-
-1. **compute**: Implements the forward pass of the operation using NumPy arrays
-2. **gradient**: Implements the backward pass (gradient computation) for use in automatic differentiation
-
-Example (EWiseAdd):
+### Operation Base Class
 ```python
-class EWiseAdd(TensorOp):
-    def compute(self, a: NDArray, b: NDArray):
-        return a + b
-
-    def gradient(self, out_grad: Tensor, node: Tensor):
-        return out_grad, out_grad
+class Op:
+    def compute(self, *args):
+        """Forward computation"""
+        pass
+        
+    def gradient(self, out_grad, node):
+        """Gradient computation"""
+        pass
 ```
 
-## Usage
+### Forward Pass
+Each operation implements the `compute` method:
+```python
+def compute(self, *args):
+    """
+    Args:
+        *args: Input NDArrays
+    Returns:
+        NDArray: Result of the operation
+    """
+```
 
-Operations can be used either directly or via operator overloading on Tensor objects:
+### Backward Pass
+Each operation implements the `gradient` method:
+```python
+def gradient(self, out_grad, node):
+    """
+    Args:
+        out_grad: Gradient from output
+        node: The node this operation created
+    Returns:
+        Gradient(s) for input(s)
+    """
+```
+
+## Common Operations Reference
+
+### Mathematical Operations
+
+1. **Addition (EWiseAdd)**
+   - Forward: \( f(x,y) = x + y \)
+   - Gradient: \( \frac{\partial f}{\partial x} = 1, \frac{\partial f}{\partial y} = 1 \)
+
+2. **Multiplication (EWiseMul)**
+   - Forward: \( f(x,y) = x * y \)
+   - Gradient: \( \frac{\partial f}{\partial x} = y, \frac{\partial f}{\partial y} = x \)
+
+3. **Matrix Multiplication (MatMul)**
+   - Forward: \( f(X,Y) = XY \)
+   - Gradient: 
+     - \( \frac{\partial f}{\partial X} = \frac{\partial L}{\partial f}Y^T \)
+     - \( \frac{\partial f}{\partial Y} = X^T\frac{\partial L}{\partial f} \)
+
+### Shape Operations
+
+1. **Reshape**
+   - Forward: Reshapes input array to target shape
+   - Gradient: Reshapes gradient back to input shape
+
+2. **Transpose**
+   - Forward: Permutes dimensions according to axes
+   - Gradient: Inverse permutation of gradient
+
+### Broadcasting Operations
+
+1. **BroadcastTo**
+   - Forward: Broadcasts input to larger shape
+   - Gradient: Reduces gradient along broadcast axes
+
+## Example Usage
 
 ```python
 import needle as ndl
 
-# Direct usage
-a = ndl.Tensor([1, 2, 3])
-b = ndl.Tensor([4, 5, 6])
-c = ndl.ops.add(a, b)  # [5, 7, 9]
+# Create input tensors
+x = ndl.Tensor([[1, 2], [3, 4]], requires_grad=True)
+y = ndl.Tensor([[5, 6], [7, 8]], requires_grad=True)
 
-# Operator overloading
-d = a + b  # Same as above
-e = a * 2  # Uses mul_scalar
-f = a @ b  # Matrix multiplication
+# Forward pass
+z = (x @ y).sum()
+
+# Backward pass
+z.backward()
+
+# Access gradients
+print(x.grad)  # Gradient of z with respect to x
+print(y.grad)  # Gradient of z with respect to y
 ```
 
-## Extension
+## Best Practices
 
-To add a new operation:
+1. **Memory Efficiency**
+   - Use in-place operations when possible
+   - Clear intermediate results when not needed
+
+2. **Numerical Stability**
+   - Use stable implementations of operations
+   - Handle edge cases in activation functions
+   - Consider using log-space for certain operations
+
+3. **Performance**
+   - Batch operations when possible
+   - Use appropriate data types
+   - Minimize memory allocations
+
+## Custom Operations
+
+To implement a custom operation:
 
 1. Create a new class inheriting from `TensorOp`
-2. Implement the `compute` method for forward pass
-3. Implement the `gradient` method for backward pass
-4. Add a helper function that creates and calls an instance of your operation class
-5. (Optional) Add operator overloading in the `Tensor` class if applicable
+2. Implement `compute` method for forward pass
+3. Implement `gradient` method for backward pass
+
+Example:
+```python
+class CustomOp(TensorOp):
+    def compute(self, x):
+        return x * x
+        
+    def gradient(self, out_grad, node):
+        x = node.inputs[0]
+        return 2 * x * out_grad
+```
