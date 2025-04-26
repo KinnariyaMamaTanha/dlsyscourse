@@ -33,11 +33,24 @@ def parse_mnist(image_filesname, label_filename):
                 for MNIST will contain the values 0-9.
     """
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    with gzip.open(image_filesname, "rb") as f:
+        magic_number = struct.unpack('>I', f.read(4))[0]
+        num_images = struct.unpack('>I', f.read(4))[0]
+        num_rows = struct.unpack('>I', f.read(4))[0]
+        num_cols = struct.unpack('>I', f.read(4))[0]
+        images = np.frombuffer(f.read(), dtype=np.uint8).reshape(num_images, num_rows * num_cols)
+        images = images.astype(np.float32) / 255.0
+    
+    with gzip.open(label_filename, "rb") as f:
+        magic_number = struct.unpack('>I', f.read(4))[0]
+        num_labels = struct.unpack('>I', f.read(4))[0]
+        labels = np.frombuffer(f.read(), dtype=np.uint8)
+    
+    return images, labels
     ### END YOUR SOLUTION
 
 
-def softmax_loss(Z, y_one_hot):
+def softmax_loss(Z: ndl.Tensor, y_one_hot: ndl.Tensor):
     """Return softmax loss.  Note that for the purposes of this assignment,
     you don't need to worry about "nicely" scaling the numerical properties
     of the log-sum-exp computation, but can just compute this directly.
@@ -54,7 +67,14 @@ def softmax_loss(Z, y_one_hot):
         Average softmax loss over the sample. (ndl.Tensor[np.float32])
     """
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    assert len(Z.shape) == 2 and len(y_one_hot.shape) == 2, "Z and y_one_hot should be 2D tensors"
+    assert Z.shape[0] == y_one_hot.shape[0], "Z and y_one_hot should have the same number of rows"
+
+    batch_size = Z.shape[0]
+    log_sum_exp = ndl.log(ndl.summation(ndl.exp(Z), axes=1)).sum()
+    z = (Z * y_one_hot).sum()
+    loss = (log_sum_exp - z) / batch_size
+    return loss
     ### END YOUR SOLUTION
 
 
