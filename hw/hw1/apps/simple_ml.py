@@ -50,7 +50,7 @@ def parse_mnist(image_filesname, label_filename):
     ### END YOUR SOLUTION
 
 
-def softmax_loss(Z: ndl.Tensor, y_one_hot: ndl.Tensor):
+def softmax_loss(Z: ndl.Tensor, y_one_hot: ndl.Tensor) -> ndl.Tensor:
     """Return softmax loss.  Note that for the purposes of this assignment,
     you don't need to worry about "nicely" scaling the numerical properties
     of the log-sum-exp computation, but can just compute this directly.
@@ -78,7 +78,7 @@ def softmax_loss(Z: ndl.Tensor, y_one_hot: ndl.Tensor):
     ### END YOUR SOLUTION
 
 
-def nn_epoch(X, y, W1, W2, lr=0.1, batch=100):
+def nn_epoch(X: np.ndarray, y: np.ndarray, W1: ndl.Tensor, W2: ndl.Tensor, lr: float=0.1, batch: int=100):
     """Run a single epoch of SGD for a two-layer neural network defined by the
     weights W1 and W2 (with no bias terms):
         logits = ReLU(X * W1) * W1
@@ -103,7 +103,29 @@ def nn_epoch(X, y, W1, W2, lr=0.1, batch=100):
     """
 
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    assert X.ndim == 2 and y.ndim == 1
+    assert X.shape[0] == y.shape[0]
+    assert len(W1.shape) == 2 and len(W2.shape) == 2
+    assert W1.shape[0] == X.shape[1]
+    assert W1.shape[1] == W2.shape[0]
+
+    bs = X.shape[0]
+    for i in range(0, bs, batch):
+        X_batch = ndl.Tensor(X[i:i+batch])
+        y_batch = ndl.Tensor(y[i:i+batch])
+
+        Z = ndl.matmul(ndl.relu(ndl.matmul(X_batch, W1)), W2)
+        y_one_hot = np.zeros((y_batch.shape[0], W2.shape[1]))
+        y_one_hot[np.arange(y_batch.shape[0]), y_batch.numpy()] = 1
+        y_one_hot = ndl.Tensor(y_one_hot)
+        loss = softmax_loss(Z, y_one_hot)
+        loss.backward()
+        new_W1 = ndl.Tensor(W1.numpy() - lr * W1.grad.numpy())
+        new_W2 = ndl.Tensor(W2.numpy() - lr * W2.grad.numpy())
+        W1, W2 = new_W1, new_W2
+    return W1, W2
+
+
     ### END YOUR SOLUTION
 
 

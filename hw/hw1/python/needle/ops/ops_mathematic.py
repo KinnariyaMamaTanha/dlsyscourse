@@ -322,7 +322,9 @@ class ReLU(TensorOp):
 
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
-        return (node.inputs[0] > 0).astype(out_grad.dtype)
+        input = node.inputs[0].realize_cached_data()
+        relu_grad = out_grad * (input > 0).astype(out_grad.dtype)
+        return relu_grad
         ### END YOUR SOLUTION
 
 
