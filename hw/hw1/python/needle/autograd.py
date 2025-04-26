@@ -364,7 +364,7 @@ class Tensor(Value):
 
 
 
-def compute_gradient_of_variables(output_tensor, out_grad):
+def compute_gradient_of_variables(output_tensor: Value, out_grad) -> None:
     """Take gradient of output node with respect to each node in node_list.
 
     Store the computed result in the grad field of each Variable.
@@ -380,7 +380,16 @@ def compute_gradient_of_variables(output_tensor, out_grad):
     reverse_topo_order = list(reversed(find_topo_sort([output_tensor])))
 
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    for node in reverse_topo_order:
+        if node.requires_grad:
+            out_grad = sum_node_list(node_to_output_grads_list[node])
+            node.grad = out_grad
+            if node.op is not None:
+                input_grads = node.op.gradient_as_tuple(out_grad, node)
+                for input_node, input_grad in zip(node.inputs, input_grads):
+                    if input_node not in node_to_output_grads_list:
+                        node_to_output_grads_list[input_node] = []
+                    node_to_output_grads_list[input_node].append(input_grad)
     ### END YOUR SOLUTION
 
 

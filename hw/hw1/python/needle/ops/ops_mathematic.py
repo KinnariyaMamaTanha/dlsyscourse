@@ -226,7 +226,7 @@ class Summation(TensorOp):
         ### BEGIN YOUR SOLUTION
         in_shape = node.inputs[0].shape
         if self.axes is None:
-            reshape_shape = in_shape
+            reshape_shape = [1 for _ in in_shape] # [1] * ndim
         else:
             if isinstance(self.axes, int):
                 self.axes = (self.axes,)
