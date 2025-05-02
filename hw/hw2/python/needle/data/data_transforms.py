@@ -1,12 +1,13 @@
 import numpy as np
 
+
 class Transform:
     def __call__(self, x):
         raise NotImplementedError
 
 
 class RandomFlipHorizontal(Transform):
-    def __init__(self, p = 0.5):
+    def __init__(self, p=0.5):
         self.p = p
 
     def __call__(self, img):
@@ -20,7 +21,9 @@ class RandomFlipHorizontal(Transform):
         """
         flip_img = np.random.rand() < self.p
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        if flip_img:
+            img = img[:, ::-1, :]
+        return img
         ### END YOUR SOLUTION
 
 
@@ -28,15 +31,33 @@ class RandomCrop(Transform):
     def __init__(self, padding=3):
         self.padding = padding
 
-    def __call__(self, img):
-        """ Zero pad and then randomly crop an image.
+    def __call__(self, img: np.ndarray):
+        """Zero pad and then randomly crop an image.
         Args:
              img: H x W x C NDArray of an image
-        Return 
-            H x W x C NAArray of cliped image
+
+        Return:
+            H x W x C NDArray of cliped image
         Note: generate the image shifted by shift_x, shift_y specified below
+              Padding is added to all sides of the image, and then the image is cropped back to it's original size at a random location. Returns an image the same size as the original image.
         """
-        shift_x, shift_y = np.random.randint(low=-self.padding, high=self.padding+1, size=2)
+        shift_x, shift_y = np.random.randint(
+            low=-self.padding, high=self.padding + 1, size=2
+        )
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        H, W, C = img.shape
+        padded_img = np.pad(
+            img,
+            ((self.padding, self.padding), (self.padding, self.padding), (0, 0)),
+            mode="constant",
+            constant_values=0,
+        )
+
+        start_y = self.padding + shift_y
+        start_x = self.padding + shift_x
+
+        # Crop the padded image
+        cropped_img = padded_img[start_x : start_x + H, start_y : start_y + W, :]
+
+        return cropped_img
         ### END YOUR SOLUTION
